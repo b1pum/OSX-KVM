@@ -51,6 +51,17 @@ if sys.version_info[0] < 3:
     import urlparse as urlstuff
 else:
     import urllib.parse as urlstuff
+# Quick fix for python 3.9 and above
+if sys.version_info[0] == 3 and sys.version_info[1] >= 9:
+    from types import MethodType
+
+    def readPlist(self,filepath):
+        with open(filepath, 'rb') as f:
+            p = plistlib._PlistParser(dict)
+            rootObject = p.parse(f)
+        return rootObject
+    # adding the method readPlist() to plistlib
+    plistlib.readPlist = MethodType(readPlist, plistlib)
 
 # https://github.com/foxlet/macOS-Simple-KVM/blob/master/tools/FetchMacOS/fetch-macos.py (unused)
 catalogs = {
@@ -140,6 +151,11 @@ def parse_server_metadata(filename):
     metadata = {}
     metadata['title'] = title
     metadata['version'] = vers
+
+    """
+    {'title': 'macOS Mojave', 'version': '10.14.5'}
+    {'title': 'macOS Mojave', 'version': '10.14.6'}
+    """
     return metadata
 
 
@@ -166,7 +182,7 @@ def parse_dist(filename):
     try:
         dom = minidom.parse(filename)
     except ExpatError:
-        print('Invalid XML in %s' % filename)
+        # print('Invalid XML in %s' % filename)  # look at this later
         return dist_info
     except IOError as err:
         print('Error reading %s: %s' % (filename, err))
@@ -328,14 +344,13 @@ def determine_version(version, product_info):
         exit(1)
 
     # display a menu of choices (some seed catalogs have multiple installers)
-    print('%2s %12s %10s %8s %11s  %s' % ('#', 'ProductID', 'Version',
-                                          'Build', 'Post Date', 'Title'))
+    print('%2s %12s %10s %11s  %s' % ('#', 'ProductID', 'Version',
+                                           'Post Date', 'Title'))
     for index, product_id in enumerate(product_info):
-        print('%2s %12s %10s %8s %11s  %s' % (
+        print('%2s %12s %10s %11s  %s' % (
             index + 1,
             product_id,
             product_info[product_id]['version'],
-            product_info[product_id]['BUILD'],
             product_info[product_id]['PostDate'].strftime('%Y-%m-%d'),
             product_info[product_id]['title']
         ))
@@ -362,7 +377,6 @@ def main():
         sys.exit('This command requires root (to install packages), so please '
                  'run again with sudo or as root.')
     """
-
     parser = argparse.ArgumentParser()
     parser.add_argument('--workdir', metavar='path_to_working_dir',
                         default='.',
@@ -400,9 +414,28 @@ def main():
 
     # (Temporary) Hack to fetch Big Sur
     if args.big_sur:
+        found = None
         products = catalog['Products']
-        # Beta 3 ID:
-        product = products["001-26097"]
+        # locate desired product
+        for pid in products:
+            product = products[pid]
+            # print(product)
+            if "Packages" not in product:
+                continue
+            packages = product["Packages"]
+            for package in packages:
+                if "IntegrityDataURL" not in package:
+                    continue
+                if "UpdateBrain" in package["IntegrityDataURL"]:
+                    found = pid
+
+        if not found:
+            print('\nI could not find the Product ID for "Big Sur". Take a look at this code.\n')
+            exit(-1)
+        else:
+            print('\nNote: The current ProductID for "Big Sur" seems to be (%s)\n' % found)
+
+        product = products[found]
         workdir = "."
         ignore_cache = False
         for package in product.get('Packages', []):

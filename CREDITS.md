@@ -77,3 +77,19 @@
 - philffm - Typo fix in `Big-Sur.md`
 
 - jviotti - Headless mode fixes
+
+- offlinehacker - libvirt support
+
+- hellodeibu - Big Sur support
+
+- kittywhiskers - Large number of changes - thank you!
+
+- zimbatm - Thank you!
+
+- Peter Asanov (ink-splatters) - Fixes for the OS-fetch script
+
+- Sangwhan "fish" Moon - Big Sur doc enhancements
+
+- ADawesomeguy - Big Sur doc enhancements
+
+- shmsh9 - Python 3.9.x support

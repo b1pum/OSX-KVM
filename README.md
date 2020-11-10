@@ -1,12 +1,7 @@
 ### Note
 
-This `README` documents the `new method` to install macOS. The older `README`
-is available [here](README-OLD.md).
-
-This `new method` does *not* require an existing physical/virtual macOS
-installation. However, this `new method` requires internet access during the
-macOS installation process. This limitation may be addressed in a future
-commit.
+This `README.md` documents the process of creating a `Virtual Hackintosh`
+system.
 
 Note: All blobs and resources included in this repository are re-derivable (all
 instructions are included!).
@@ -15,6 +10,10 @@ instructions are included!).
 over email](mailto:dhiru.kholia@gmail.com?subject=[GitHub]%20OSX-KVM%20Commercial%20Support%20Request&body=Hi%20-%20We%20are%20interested%20in%20purchasing%20commercial%20support%20options%20for%20your%20project.) for a chat for **commercial support options only**.
 
 Looking for `Big Sur` support? See these [notes](Big-Sur.md).
+
+Working with `Proxmox` and macOS? See [Nick's blog for sure](https://www.nicksherlock.com/).
+
+Yes, we support offline macOS installations now 🎉
 
 
 ### Contributing Back
@@ -25,10 +24,8 @@ help (pull-requests!) with the following work items:
 * Create *full* installation (ISO) image without requiring an existing macOS
   physical/virtual installation.
 
-* An Ansible playbook to automate all-the-things!
-
-* Documentation around running macOS on popular cloud providers (GCP, AWS). See
-  the `Is This Legal?` section and associated references.
+* Documentation around running macOS on popular cloud providers (Hetzner, GCP,
+  AWS). See the `Is This Legal?` section and associated references.
 
 * Test `accel=hvf` flag on QEMU + macOS Mojave on MacBook Pro.
 
@@ -47,18 +44,20 @@ help (pull-requests!) with the following work items:
 * Document usage of [munki](https://github.com/munki/munki) to deploy software
   to such a `build farm`.
 
-* Enable SSH support out of the box or more easily.
+* Enable VNC + SSH support out of the box or more easily.
 
 * Better support + docs for AMD Ryzen.
 
-* Patches to unify the various scripts we have. Robustness improvements.
+* Robustness improvements are always welcome!
+
+* (Not so) crazy idea - automate the macOS installation via OpenCV.
 
 
 ### Requirements
 
-* A modern Linux distribution. E.g. Ubuntu 18.04 LTS 64-bit or later.
+* A modern Linux distribution. E.g. Ubuntu 20.04 LTS 64-bit or later.
 
-* QEMU > 2.11.1
+* QEMU >= 4.2.0
 
 * A CPU with Intel VT-x / AMD SVM support is required
 
@@ -87,7 +86,7 @@ Phenom II X3 720 does not. Ryzen processors work just fine.
 * Install QEMU and other packages.
 
   ```
-  sudo apt-get install qemu uml-utilities virt-manager dmg2img git wget libguestfs-tools
+  sudo apt-get install qemu uml-utilities virt-manager git wget libguestfs-tools -y
   ```
 
   This step may need to be adapted for your Linux distribution.
@@ -98,7 +97,7 @@ Phenom II X3 720 does not. Ryzen processors work just fine.
   ```
   cd ~
 
-  git clone https://github.com/kholia/OSX-KVM.git
+  git clone --depth 1 https://github.com/kholia/OSX-KVM.git
 
   cd OSX-KVM
   ```
@@ -116,18 +115,20 @@ Phenom II X3 720 does not. Ryzen processors work just fine.
 
   ```
   $ ./fetch-macOS.py
-  #    ProductID    Version    Build   Post Date  Title
-  1    061-26578    10.14.5  18F2059  2019-10-14  macOS Mojave
-  2    061-26589    10.14.6   18G103  2019-10-14  macOS Mojave
-  3    041-91758    10.13.6    17G66  2019-10-19  macOS High Sierra
-  4    041-88800    10.14.4  18E2034  2019-10-23  macOS Mojave
-  5    041-90855    10.13.5   17F66a  2019-10-23  Install macOS High Sierra Beta
-  6    061-44345    10.15.2   19C39d  2019-11-15  macOS Catalina Beta
-  7    061-77704    10.15.4  19E242d  2020-02-26  macOS Catalina Beta
-  8    061-86291    10.15.3  19D2064  2020-03-23  macOS Catalina
-  9    061-96006    10.15.4   19E287  2020-04-08  macOS Catalina
+   #    ProductID    Version   Post Date  Title
+   1    061-26578    10.14.5  2019-10-14  macOS Mojave
+   2    061-26589    10.14.6  2019-10-14  macOS Mojave
+   3    041-91758    10.13.6  2019-10-19  macOS High Sierra
+   4    041-88800    10.14.4  2019-10-23  macOS Mojave
+   5    041-90855    10.13.5  2019-10-23  Install macOS High Sierra Beta
+   6    061-86291    10.15.3  2020-03-23  macOS Catalina
+   7    001-04366    10.15.4  2020-05-04  macOS Catalina
+   8    001-15219    10.15.5  2020-06-15  macOS Catalina
+   9    001-36735    10.15.6  2020-08-06  macOS Catalina
+  10    001-36801    10.15.6  2020-08-12  macOS Catalina
+  11    001-51042    10.15.7  2020-09-24  macOS Catalina
 
-  Choose a product to download (1-9): 9
+  Choose a product to download (1-11): 11
   ```
 
   Attention: Modern NVIDIA GPUs are supported on HighSierra but not on later
@@ -136,55 +137,32 @@ Phenom II X3 720 does not. Ryzen processors work just fine.
   Next, convert this file into a usable format.
 
   ```
-  dmg2img BaseSystem.dmg BaseSystem.img
-  ```
-
-  Note: You can also use the following command to do this conversion, if your
-  QEMU version is >= 4.0.0.
-
-  ```
   qemu-img convert BaseSystem.dmg -O raw BaseSystem.img
   ```
 
-* Create a virtual HDD image where macOS will be installed.  If you change the
+* Create a virtual HDD image where macOS will be installed. If you change the
   name of the disk image from `mac_hdd.img` to something else, the boot scripts
-  will need updating to point to the new image name.
+  will need to be updated to point to the new image name.
 
   ```
   qemu-img create -f qcow2 mac_hdd_ng.img 128G
   ```
 
-* Setup quick networking by running the following commands.
-
-  ```
-  sudo ip tuntap add dev tap0 mode tap
-  sudo ip link set tap0 up promisc on
-  sudo ip link set dev virbr0 up
-  sudo ip link set dev tap0 master virbr0
-  ```
-
-  Note: If `virbr0` network interface is not present on your system, it may
-  have been deactivated. Try enabling it by using the following commands,
-
-  ```
-  virsh net-start default
-
-  virsh net-autostart default
-  ```
+  NOTE: Create this HDD image file on a fast SSD/NVMe disk for best results.
 
 * Now you are ready to install macOS 🚀
 
 
 ### Installation
 
-- CLI method (primary). Just run the `boot-macOS-Catalina.sh` script to start the
+- CLI method (primary). Just run the `OpenCore-Boot.sh` script to start the
   installation proces.
 
   ```
-  ./boot-macOS-Catalina.sh
+  ./OpenCore-Boot.sh
   ```
 
-  Experimental: Use the `OpenCore-Boot.sh` script to maximize fun ;)
+  Note: This same script works for Big Sur, Catalina, Mojave, and High Sierra.
 
   If you are new to installing macOS, see the [older README](README-OLD.md) for
   help.
@@ -215,6 +193,24 @@ Phenom II X3 720 does not. Ryzen processors work just fine.
     `virt-manager` is able to start the `macOS` VM.
 
 
+### Setting Expectations Right
+
+Nice job on setting up a `Virtual Hackintosh` system! Such a system can be used
+for a variety of purposes (e.g. software builds, testing, reversing work), and
+it may be all you need, along with some tweaks documented in this repository.
+
+However, such a system lacks graphical acceleration, a reliable sound sub-system,
+USB (3) functionality and other similar things. To enable these things, take a
+look at our [notes](notes.md). We would like to resume our testing and
+documentation work around this area. Please [reach out to us](mailto:dhiru.kholia@gmail.com?subject=[GitHub]%20OSX-KVM%20Funding%20Support)
+if you are able to fund this area of work.
+
+Specifically, we are looking for an AMD RX 560/570 GPU for testing purposes.
+
+It is possible to have 'beyond-native-apple-hw' performance but it does require
+work, patience, and a bit of luck (perhaps?).
+
+
 ### Post-Installation
 
 * See [networking notes](networking-qemu-kvm-howto.txt) to setup guest networking.
@@ -232,12 +228,15 @@ Phenom II X3 720 does not. Ryzen processors work just fine.
 
   This has been enough for me so far.
 
+  Note: You may need to [enable the `rc.local` functionality manually on modern Ubuntu versions](https://linuxmedium.com/how-to-enable-etc-rc-local-with-systemd-on-ubuntu-20-04/).
+
 * To get sound on your virtual Mac, see the "Virtual Sound Device" in [notes](notes.md).
 
 * To passthrough GPUs and other devices, see [these notes](notes.md).
 
-* Need a different resolution? Check out the [notes](notes.md) included in this
-  repository.
+* Need a different resolution? Check out the [notes](notes.md) included in this repository.
+
+* To generate your own SMBIOS, use [GenSMBIOS](https://github.com/corpnewt/GenSMBIOS).
 
 
 ### Is This Legal?
@@ -249,10 +248,19 @@ Gabriel Somlo also has [some thoughts](http://www.contrib.andrew.cmu.edu/~somlo/
 
 ### Motivation
 
-My aim is to enable macOS based builds + testing, kernel debugging, reversing
-and security tasks in an easy, reproducible manner without needing to invest in
-Apple's closed ecosystem (too heavily).
+My aim is to enable macOS based educational tasks, builds + testing, kernel
+debugging, reversing, and macOS security research in an easy, reproducible
+manner without getting 'invested' in Apple's closed ecosystem (too heavily).
 
-Backstory: I was a (poor) student in Canada once and Apple made [my work on
-cracking Apple Keychains](https://github.com/magnumripper/JohnTheRipper/) a lot
-harder than it needed to be.
+These `Virtual Hackintosh` systems are not intended to replace the genuine
+physical macOS systems.
+
+Personally speaking, this repository has been a way for me to 'exit' the Apple
+ecosystem. It has helped me to test and compare the interoperability of `Canon
+CanoScan LiDE 120` scanner, and `Brother HL-2250DN` laser printer. And these
+devices now work decently enough on modern versions of Ubuntu (Yay for free
+software). Also, a long time back, I had to completely wipe my (then) brand new
+`MacBook Pro (Retina, 15-inch, Late 2013)` and install Xubuntu on it - as the
+`OS X` kernel kept crashing on it!
+
+Backstory: I was a (poor) student in Canada once and Apple made [my work on cracking Apple Keychains](https://github.com/openwall/john/blob/bleeding-jumbo/src/keychain_fmt_plug.c) a lot harder than it needed to be.
